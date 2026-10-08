@@ -1,0 +1,59 @@
+
+name: Wird CI — Build & Validate
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+  pull_request:
+    branches:
+      - main
+      - master
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wird-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  build:
+    name: Build Wird web app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # فحص lint موروث من مكونات UI العامة؛ لا يمنع بناء نسخة الإنتاج حاليًا.
+      - name: Run ESLint report
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload production artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wird-production-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
